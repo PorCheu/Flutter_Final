@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'screens/welcome_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/add_alert_screen.dart';
 import 'screens/calendar_screen.dart';
 import 'services/notification_service.dart';
+import 'data/datasources/local_data_source.dart';
+import 'data/repositories/alert_repository.dart';
+import 'data/services/data_initialization_service.dart';
 
 // Entry point for the app. Initializes notifications and sets up routes.
 void main() async {
@@ -12,14 +16,24 @@ void main() async {
   // Initialize notification service early
   await NotificationService.init();
 
+  // Initialize data layer with demo data on first run
+  final localDataSource = LocalDataSource();
+  final dataInitService = DataInitializationService(localDataSource);
+  await dataInitService.initialize();
+
+  // Create repositories for dependency injection
+  final alertRepository = AlertRepository(localDataSource);
+
   // Lock orientation to portrait for simplicity (optional)
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
-  runApp(const HabitAlertApp());
+  runApp(HabitAlertApp(alertRepository: alertRepository));
 }
 
 class HabitAlertApp extends StatelessWidget {
-  const HabitAlertApp({Key? key}) : super(key: key);
+  final AlertRepository alertRepository;
+
+  const HabitAlertApp({super.key, required this.alertRepository});
 
   @override
   Widget build(BuildContext context) {
@@ -63,12 +77,13 @@ class HabitAlertApp extends StatelessWidget {
           ),
         ),
       ),
-      // Start directly on Home screen (no welcome page on boot)
-      initialRoute: '/home',
+      // Start on Welcome screen, then navigate: Welcome -> Home -> Add/Calendar
+      initialRoute: '/welcome',
       routes: {
-        '/home': (c) => const HomeScreen(),
-        '/add': (c) => const AddAlertScreen(),
-        '/calendar': (c) => const CalendarScreen(),
+        '/welcome': (c) => const WelcomeScreen(),
+        '/home': (c) => HomeScreen(alertRepository: alertRepository),
+        '/add': (c) => AddAlertScreen(alertRepository: alertRepository),
+        '/calendar': (c) => CalendarScreen(alertRepository: alertRepository),
       },
     );
   }
